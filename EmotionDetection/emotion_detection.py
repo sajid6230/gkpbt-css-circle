@@ -1,45 +1,58 @@
-import requests
-import json
+'''Emotion Detection Code'''
+
+import json  # Standard import should be first
+import requests  # Third-party imports come after standard imports
 
 def emotion_detector(text_to_analyze):
-    url = 'https://sn-watson-emotion.labs.skills.network/v1/watson.runtime.nlp.v1/NlpService/EmotionPredict'
-    myobj = { "raw_document": { "text": text_to_analyze } }
-    header =  {"grpc-metadata-mm-model-id": "emotion_aggregated-workflow_lang_en_stock"}
+    '''Function to analyze emotions in the given text'''
     
-    # Send the POST request to the API
-    response = requests.post(url, json=myobj, headers=header)
-    
-    # Print the raw response text for debugging
-    print("Raw Response:", response.text)
-    
-    # Parse the response JSON into a dictionary
-    response_dict = json.loads(response.text)
-    
-    # Extract emotions dictionary from the response
-    emotion_data = response_dict['emotionPredictions'][0]['emotion']
-    
-    # Assign emotion scores to variables
-    anger_score = emotion_data.get('anger', 0)
-    disgust_score = emotion_data.get('disgust', 0)
-    fear_score = emotion_data.get('fear', 0)
-    joy_score = emotion_data.get('joy', 0)
-    sadness_score = emotion_data.get('sadness', 0)
-    
-    # Create a dictionary of emotions and scores
-    emotions_scores = {
-        'anger': anger_score,
-        'disgust': disgust_score,
-        'fear': fear_score,
-        'joy': joy_score,
-        'sadness': sadness_score
-    }
-    
-    # Find the dominant emotion (highest score)
-    dominant_emotion = max(emotions_scores, key=emotions_scores.get)
-    
-    # Include dominant emotion in the output dictionary
-    emotions_scores['dominant_emotion'] = dominant_emotion
-    
-    return emotions_scores
+    url = ('https://sn-watson-emotion.labs.skills.network/'
+           'v1/watson.runtime.nlp.v1/NlpService/EmotionPredict')
+    myobj = {"raw_document": {"text": text_to_analyze}}
+    header = {"grpc-metadata-mm-model-id": "emotion_aggregated-workflow_lang_en_stock"}
 
+    # Handling blank input
+    if not text_to_analyze.strip():
+        return {
+            "anger": None,
+            "disgust": None,
+            "fear": None,
+            "joy": None,
+            "sadness": None,
+            "dominant_emotion": None
+        }
 
+    try:
+        response = requests.post(url, json=myobj, headers=header, timeout=10)
+
+        # Handle API returning a 400 error
+        if response.status_code == 400:
+            return {
+                "anger": None,
+                "disgust": None,
+                "fear": None,
+                "joy": None,
+                "sadness": None,
+                "dominant_emotion": None
+            }
+
+        response_dict = response.json()  # Directly parse JSON response
+
+        # Extract emotion data safely
+        emotion_data = response_dict.get('emotionPredictions', [{}])[0].get('emotion', {})
+
+        # Find the dominant emotion
+        dominant_emotion = max(emotion_data, key=emotion_data.get, default=None)
+
+        # Return formatted dictionary with emotions and dominant emotion
+        return {
+            "anger": emotion_data.get('anger'),
+            "disgust": emotion_data.get('disgust'),
+            "fear": emotion_data.get('fear'),
+            "joy": emotion_data.get('joy'),
+            "sadness": emotion_data.get('sadness'),
+            "dominant_emotion": dominant_emotion
+        }
+
+    except requests.RequestException as e:
+        return {"error": f"API request failed: {str(e)}"}
